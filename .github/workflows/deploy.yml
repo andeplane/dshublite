@@ -23,7 +23,6 @@ jobs:
       - name: Build the JupyterLite site
         working-directory: ./jupyterlite
         run: |
-          cp README.md content
           jupyter lite build --contents content
       - name: Use Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v1
