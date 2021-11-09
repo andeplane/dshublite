@@ -9,10 +9,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v2
-        working-directory: ./jupyterlite
       - name: Setup Python
         uses: actions/setup-python@v2
-        working-directory: ./jupyterlite
         with:
           python-version: 3.8
       - name: Install the dependencies
@@ -48,8 +46,7 @@ jobs:
       run: cp -r ./jupyterlite/_output ./app/build/public/jupyterlite
       id: random-color-generator
     - name: Deploy app
-      working-directory: ./app
       uses: peaceiris/actions-gh-pages@v3
       with:
         github_token: ${{ secrets.GITHUB_TOKEN }}
-        publish_dir: ./build
+        publish_dir: ./app/build
