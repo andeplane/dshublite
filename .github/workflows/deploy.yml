@@ -30,16 +30,15 @@ jobs:
           node-version: ${{ matrix.node-version }}
       - name: Install Packages
         working-directory: ./app
-        run: npm install
+        run: yarn
       - name: Build
         working-directory: ./app
-        run: npm run build
+        run: yarn build
       - name: Build app
         working-directory: ./app
-        run: npm run predeploy
+        run: yarn predeploy
       - name: Copy JupyterLite
         run: cp -r ./jupyterlite/_output ./app/build/public/jupyterlite
-        id: random-color-generator
       - name: Deploy app
         uses: peaceiris/actions-gh-pages@v3
         with:
