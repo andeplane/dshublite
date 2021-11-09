@@ -1,0 +1,6 @@
+ipympl>=0.8.2
+ipywidgets>=7.6
+jupyterlab~=3.2.0
+jupyterlab-tour
+jupyterlite==0.1.0a16
+plotly>=5,<6
