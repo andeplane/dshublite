@@ -1,0 +1,18 @@
+<svg width="80" height="80" viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+<circle cx="40.0007" cy="40" r="33" fill="#FDF3F5"/>
+<circle cx="40" cy="40" r="36.8487" transform="rotate(3.35681 40 40)" stroke="#D51A46" stroke-width="2" stroke-dasharray="5 3"/>
+<circle cx="40.0007" cy="40" r="29" stroke="#FDCED6" stroke-width="2" stroke-dasharray="5 3"/>
+<rect x="45.0472" y="27.0471" width="1.36475" height="1.36475" rx="0.682373" transform="rotate(180 45.0472 27.0471)" fill="#D51A46" stroke="#D51A46" stroke-width="1.36475"/>
+<rect x="50.505" y="27.0471" width="1.36475" height="1.36475" rx="0.682373" transform="rotate(180 50.505 27.0471)" fill="#D51A46" stroke="#D51A46" stroke-width="1.36475"/>
+<rect x="55.9629" y="27.0471" width="1.36475" height="1.36475" rx="0.682373" transform="rotate(180 55.9629 27.0471)" fill="#D51A46" stroke="#D51A46" stroke-width="1.36475"/>
+<rect x="10.5" y="31.5" width="37.1739" height="47.7778" rx="4.55952" fill="#FDF3F5" stroke="#D51A46"/>
+<rect x="38.0251" y="60.5387" width="1.51484" height="1.51484" rx="0.757419" fill="#D51A46" stroke="#D51A46" stroke-width="1.51484"/>
+<rect x="38.0251" y="54.4811" width="1.51484" height="1.51484" rx="0.757419" fill="#D51A46" stroke="#D51A46" stroke-width="1.51484"/>
+<rect x="38.0251" y="66.5982" width="1.51484" height="1.51484" rx="0.757419" fill="#D51A46" stroke="#D51A46" stroke-width="1.51484"/>
+<line x1="17.0596" y1="42.7256" x2="32.0258" y2="42.7256" stroke="#D51A46" stroke-width="2" stroke-linecap="round"/>
+<line x1="17.0596" y1="49.085" x2="32.0258" y2="49.085" stroke="#D51A46" stroke-width="2" stroke-linecap="round"/>
+<line x1="17.0596" y1="61.8105" x2="30.208" y2="61.8105" stroke="#D51A46" stroke-width="2" stroke-linecap="round"/>
+<line x1="17.0596" y1="55.752" x2="25.6634" y2="55.752" stroke="#D51A46" stroke-width="2" stroke-linecap="round"/>
+<line x1="17.0596" y1="67.8682" x2="28.6931" y2="67.8682" stroke="#D51A46" stroke-width="2" stroke-linecap="round"/>
+<line x1="4" y1="79.5" x2="54" y2="79.5" stroke="#D51A46"/>
+</svg>
