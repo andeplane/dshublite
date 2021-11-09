@@ -8,7 +8,7 @@ export const HomePage = () => {
 
   if (token) {
     const url = encodeURI(
-      `http://localhost:8000/lab/index.html?token=${token}&project=${project}&cluster=${cluster}`
+      `https://${window.location.host}/jupyter/lab/index.html?token=${token}&project=${project}&cluster=${cluster}`
     );
     return (
       <iframe
