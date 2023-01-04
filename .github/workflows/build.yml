@@ -1,0 +1,243 @@
+name: Build
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - '*'
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+env:
+  CACHE_EPOCH: 3
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      BUILDING_IN_CI: 1
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Build dist
+        uses: ./.github/actions/build-dist
+      - name: Unzip
+        shell: bash
+        run: tar zxvf ./dist/jupyterlite-app-0.1.0-beta.17.tgz
+      - name: Copy contents
+        shell: bash
+        run: cp -r ./contents/* ./package
+      - name: Upload (dist)
+        uses: actions/upload-pages-artifact@v1
+        with:
+          path: ./package
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v1
+
+  test:
+    needs: [build]
+    runs-on: ${{ matrix.os }}-latest
+    env:
+      TESTING_IN_CI: 1
+      PYTEST_ARGS: ${{ matrix.pytest-args }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu, windows, macos]
+        python-version: ['3.7', '3.10', 'pypy-3.7']
+        include:
+          # OS-specifics for running pip
+          - os: ubuntu
+            pip-cache: ~/.cache/pip
+            python-command: python3
+          - os: macos
+            pip-cache: ~/Library/Caches/pip
+            python-command: python3
+          - os: windows
+            pip-cache: ~\AppData\Local\pip\Cache
+            python-command: python
+          # python-specifics for tests
+          - python-version: '3.7'
+            pytest-args: '[]'
+          - python-version: '3.10'
+            pytest-args: '[]'
+          - python-version: 'pypy-3.7'
+            # TODO: some instability with libarchive, might be better with pypy-3.8
+            # after https://github.com/cloudpipe/cloudpickle/pull/461
+            pytest-args: '["-k", "not _archive_is_"]'
+        exclude:
+          - os: windows
+            python-version: pypy-3.7
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Setup pip (base)
+        run: ${{ matrix.python-command }} -m pip install --user -U pip setuptools wheel
+      - name: Download (dist)
+        uses: actions/download-artifact@v3
+        with:
+          name: jupyterlite dist ${{ github.run_number }}
+          path: ./dist
+      - name: Cache (pip)
+        uses: actions/cache@v3
+        with:
+          path: ${{ matrix.pip-cache }}
+          key: |
+            ${{ env.CACHE_EPOCH }}-${{ runner.os }}-pip-test-${{ matrix.python-version }}-${{ hashFiles('requirements*.txt') }}
+          restore-keys: |
+            ${{ env.CACHE_EPOCH }}-${{ runner.os }}-pip-test-${{ matrix.python-version }}-
+            ${{ env.CACHE_EPOCH }}-${{ runner.os }}-pip-test-
+            ${{ env.CACHE_EPOCH }}-${{ runner.os }}-pip-
+      - name: Install (py)
+        run: |
+          ${{ matrix.python-command }} -m pip install importlib_metadata 'doit >=0.34,<1' jupyter_core
+          ${{ matrix.python-command }} -m pip install --find-links dist --no-index jupyterlite
+          ${{ matrix.python-command }} -m pip check
+      - name: Prepare smoke test folder
+        shell: bash
+        run: mkdir -p build/smoke-test
+      - name: Get SOURCE_DATE_EPOCH
+        id: source-date
+        shell: bash -eux {0}
+        run: |
+          echo "epoch=$(git log -1 --format=%ct)" >> $GITHUB_OUTPUT
+      - name: Test (CLI)
+        run: |
+          cd build/smoke-test
+          jupyter lite --version || exit 1
+          jupyter lite --help || exit 1
+          jupyter lite list || exit 1
+          jupyter lite status || exit 1
+          jupyter lite build || exit 1
+          jupyter lite check || exit 1
+          jupyter lite archive --source-date-epoch ${{ steps.source-date.outputs.epoch }} || exit 1
+          jupyter lite list || exit 1
+          jupyter lite status --debug || exit 1
+      - name: Setup pip (test)
+        run: ${{ matrix.python-command }} -m pip install -r requirements-test.txt
+      - name: Test (py)
+        run: doit test:py:*
+      - name: Upload (reports)
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: |
+            jupyterlite reports ${{ github.run_number }} ${{ matrix.os }} ${{ matrix.python-version }}
+          path: |
+            build/htmlcov
+            build/pytest
+
+  docs:
+    needs: [build, lint-js-test]
+    runs-on: ubuntu-latest
+    env:
+      DOCS_IN_CI: 1
+      FORCE_PYODIDE: 1
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Download (dist)
+        uses: actions/download-artifact@v3
+        with:
+          name: jupyterlite dist ${{ github.run_number }}
+          path: ./dist
+      - name: Download (typedoc)
+        uses: actions/download-artifact@v3
+        with:
+          name: jupyterlite typedoc ${{ github.run_number }}
+          path: ./docs/reference/api/ts
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+      - name: Install node
+        uses: actions/setup-node@v3
+        with:
+          node-version: '16.x'
+      - name: Cache (node_modules)
+        uses: actions/cache@v3
+        id: cache-node-modules
+        with:
+          path: node_modules/
+          key: |
+            ${{ env.CACHE_EPOCH }}-${{ runner.os }}-node-modules-${{ hashFiles('yarn.lock') }}
+      - name: Cache (.yarn-packages)
+        uses: actions/cache@v3
+        id: cache-yarn-packages
+        if: steps.cache-node-modules.outputs.cache-hit != 'true'
+        with:
+          path: .yarn-packages
+          key: |
+            ${{ env.CACHE_EPOCH }}-yarn-packages-${{ hashFiles('yarn.lock') }}
+          restore-keys: |
+            ${{ env.CACHE_EPOCH }}-yarn-packages-
+      - name: Install
+        if: steps.cache-node-modules.outputs.cache-hit != 'true'
+        run: doit setup:js
+      - name: Setup pip (base)
+        run: python3 -m pip install --user -U pip setuptools wheel
+      - name: Cache (pip)
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/pip
+          key: |
+            ${{ env.CACHE_EPOCH }}-${{ runner.os }}-pip-docs-${{ hashFiles('requirements*.txt') }}
+          restore-keys: |
+            ${{ env.CACHE_EPOCH }}-${{ runner.os }}-pip-docs-
+            ${{ env.CACHE_EPOCH }}-${{ runner.os }}-pip-
+      - name: Cache (docs extensions)
+        uses: actions/cache@v3
+        with:
+          path: ./examples/.cache
+          key: |
+            ${{ env.CACHE_EPOCH }}-docs-app-${{ hashFiles('examples/*.json') }}
+          restore-keys: |
+            ${{ env.CACHE_EPOCH }}-docs-app-
+      - name: Setup pip (docs)
+        run: python3 -m pip install -r requirements-docs.txt
+      - name: Install (py)
+        run: doit dev:py:jupyterlite
+      - name: Docs (app)
+        run: doit docs:app:build
+      - name: Docs (app archive)
+        run: doit docs:app:pack
+      - name: Upload (docs app archive)
+        uses: actions/upload-artifact@v3
+        with:
+          name: jupyterlite docs archive ${{ github.run_number }}
+          path: |
+            build/docs-app/jupyterlite-docs-*.tgz
+      - name: Docs (sphinx)
+        run: doit docs:sphinx
+      - name: Check Built Artifacts
+        run: doit check
+      - name: Test (py)
+        run: doit test:py:jupyterlite
+      - name: Upload (reports)
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: |
+            jupyterlite reports ${{ github.run_number }} ${{ matrix.os }} ${{ matrix.python-version }}
+          path: |
+            build/htmlcov
+            build/pytest
+      - name: Upload (sphinx logs)
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: jupyterlite sphinx logs ${{ github.run_number }}
+          if-no-files-found: ignore
+          path: /tmp/sphinx-*.log
