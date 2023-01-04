@@ -27,7 +27,7 @@ jobs:
       - name: Build dist
         uses: ./.github/actions/build-dist
   deploy:
-  needs: [build]
+    needs: [build]
     runs-on: ubuntu-latest
     environment:
       name: github-pages
