@@ -1,0 +1,29 @@
+{
+  "extends": "../../tsconfigbase",
+  "compilerOptions": {
+    "outDir": "lib",
+    "rootDir": "src"
+  },
+  "include": ["src/**/*"],
+  "references": [
+    { "path": "../application" },
+    { "path": "../application-extension" },
+    { "path": "../contents" },
+    { "path": "../iframe-extension" },
+    { "path": "../javascript-kernel" },
+    { "path": "../javascript-kernel-extension" },
+    { "path": "../kernel" },
+    { "path": "../licenses" },
+    { "path": "../localforage" },
+    { "path": "../pyolite-kernel" },
+    { "path": "../pyolite-kernel-extension" },
+    { "path": "../repl-extension" },
+    { "path": "../retro-application-extension" },
+    { "path": "../server-extension" },
+    { "path": "../session" },
+    { "path": "../settings" },
+    { "path": "../translation" },
+    { "path": "../types" },
+    { "path": "../ui-components" }
+  ]
+}
