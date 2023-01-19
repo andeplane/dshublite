@@ -1,9 +1,14 @@
-name: Build
+name: Build and deploy
 
 on:
-  pull_request:
+  push:
     branches:
-      - '*'
+      - main
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
 
 env:
   CACHE_EPOCH: 3
@@ -13,6 +18,9 @@ jobs:
     runs-on: ubuntu-latest
     env:
       BUILDING_IN_CI: 1
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - name: Checkout
         uses: actions/checkout@v3
@@ -24,3 +32,11 @@ jobs:
       - name: Copy contents
         shell: bash
         run: cp -r ./contents/* ./package
+      - name: Upload (dist)
+        uses: actions/upload-pages-artifact@v1
+        with:
+          path: ./package
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v1
+  
