@@ -13,9 +13,6 @@ jobs:
     runs-on: ubuntu-latest
     env:
       BUILDING_IN_CI: 1
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - name: Checkout
         uses: actions/checkout@v3
