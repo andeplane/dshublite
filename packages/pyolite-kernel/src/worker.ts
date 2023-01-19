@@ -149,18 +149,18 @@ export class PyoliteRemoteKernel {
 
       import pyolite
       import pyodide_http
-      
+
       pyodide_http.patch_all()
       import cognite.client
       from cognite.client import global_config
       global_config.disable_gzip = True
+      global_config.max_workers = 1
       pyodide_http._requests.PyodideHTTPAdapter._old_send = pyodide_http._requests.PyodideHTTPAdapter.send
       def new_send(self, request, **kwargs):
           response = self._old_send(request, **kwargs)
           response.raw.version = ''
           return response
       pyodide_http._requests.PyodideHTTPAdapter.send = new_send
-
 
       cognite.client._http_client.HTTPClient._old_init = cognite.client._http_client.HTTPClient.__init__
       def new_init(self, config, session, retry_tracker_factory = cognite.client._http_client._RetryTracker):
