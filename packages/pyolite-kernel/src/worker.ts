@@ -19,8 +19,7 @@ export class PyoliteRemoteKernel {
    **/
   async initialize(options: IPyoliteWorkerKernel.IOptions): Promise<void> {
     this._options = options;
-    console.log("Options: ", options)
-
+    
     if (options.location.includes(':')) {
       const parts = options.location.split(':');
       this._driveName = parts[0];
