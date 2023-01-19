@@ -147,10 +147,9 @@ export class PyoliteRemoteKernel {
           def __exit__(self, type, value, traceback):
               self.shutdown()
 
-      import os
-      os.environ["COGNITE_PATCHED"] = "3.0"
       import pyolite
       import pyodide_http
+      
       pyodide_http.patch_all()
       import cognite.client
       from cognite.client import global_config
