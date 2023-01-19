@@ -1,9 +1,14 @@
 name: Build
 
 on:
-  pull_request:
+  push:
     branches:
-      - '*'
+      - main
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
 
 env:
   CACHE_EPOCH: 3
@@ -27,3 +32,11 @@ jobs:
       - name: Copy contents
         shell: bash
         run: cp -r ./contents/* ./package
+      - name: Upload (dist)
+        uses: actions/upload-pages-artifact@v1
+        with:
+          path: ./package
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v1
+  
