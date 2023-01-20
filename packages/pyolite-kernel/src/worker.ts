@@ -19,7 +19,7 @@ export class PyoliteRemoteKernel {
    **/
   async initialize(options: IPyoliteWorkerKernel.IOptions): Promise<void> {
     this._options = options;
-    
+
     if (options.location.includes(':')) {
       const parts = options.location.split(':');
       this._driveName = parts[0];
@@ -100,7 +100,7 @@ export class PyoliteRemoteKernel {
 
       # We need to patch a few things:
       # 1) disable gzip as it is not supported
-      # 2) patch requests as it does not work in pyodide 
+      # 2) patch requests as it does not work in pyodide
       # 3) patch the patched requests (From pyodide-http) as Cognite SDK expects responses to have .raw set
       # 4) patch Cognite SDK to use another HTTP adapter
       # 5) patch Cognite SDK to use a mock implementation of the PriorityThreadPoolExecutor since threading is not supported in pyodide
@@ -110,9 +110,9 @@ export class PyoliteRemoteKernel {
       # Disable protobuf warning
       import warnings
       warnings.filterwarnings(
-          "ignore",
+          action="ignore",
           category=UserWarning,
-          message="is missing compiled C binaries",
+          message="Your installation of 'protobuf' is missing compiled C binaries",
       )
 
       # These are mock classes for the PriorityThreadPoolExecutor. TODO: Move to Cognite SDK
@@ -184,14 +184,14 @@ export class PyoliteRemoteKernel {
         response.raw.version = ''
         return response
       pyodide_http._requests.PyodideHTTPAdapter.send = PyodideHTTPAdapter_send
-      
+
       cognite.client._http_client.HTTPClient._old_init = cognite.client._http_client.HTTPClient.__init__
       def HTTPClient_init(self, config, session, retry_tracker_factory = cognite.client._http_client._RetryTracker):
         self._old_init(config, session, retry_tracker_factory)
         self.session.mount("https://", pyodide_http._requests.PyodideHTTPAdapter())
         self.session.mount("http://", pyodide_http._requests.PyodideHTTPAdapter())
       cognite.client._http_client.HTTPClient.__init__ = HTTPClient_init
-      
+
       cognite.client._api.datapoints.PriorityThreadPoolExecutor = MockPriorityThreadPoolExecutor
       cognite.client._api.datapoints.as_completed = mock_as_completed
 
