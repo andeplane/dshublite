@@ -105,6 +105,15 @@ export class PyoliteRemoteKernel {
       # 4) patch Cognite SDK to use another HTTP adapter
       # 5) patch Cognite SDK to use a mock implementation of the PriorityThreadPoolExecutor since threading is not supported in pyodide
       # 6) patch Cognite SDK to have max_workers = 1
+      # 7) disable warning on non compiled protobuf version
+
+      # Disable protobuf warning
+      import warnings
+      warnings.filterwarnings(
+          "ignore",
+          category=UserWarning,
+          message="is missing compiled C binaries",
+      )
 
       # These are mock classes for the PriorityThreadPoolExecutor. TODO: Move to Cognite SDK
 
@@ -168,7 +177,7 @@ export class PyoliteRemoteKernel {
       import cognite.client
       from cognite.client import global_config
       global_config.disable_gzip = True
-      
+
       pyodide_http._requests.PyodideHTTPAdapter._old_send = pyodide_http._requests.PyodideHTTPAdapter.send
       def PyodideHTTPAdapter_send(self, request, **kwargs):
         response = self._old_send(request, **kwargs)
