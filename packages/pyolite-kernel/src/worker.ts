@@ -106,6 +106,8 @@ export class PyoliteRemoteKernel {
       # 5) patch Cognite SDK to use a mock implementation of the PriorityThreadPoolExecutor since threading is not supported in pyodide
       # 6) patch Cognite SDK to have max_workers = 1
 
+      # These are mock classes for the PriorityThreadPoolExecutor. TODO: Move to Cognite SDK
+
       import functools
       import inspect
       from concurrent.futures import CancelledError
@@ -162,9 +164,11 @@ export class PyoliteRemoteKernel {
       pyodide_http.patch_all()
 
       # Patch Cognite SDK
+
       import cognite.client
       from cognite.client import global_config
       global_config.disable_gzip = True
+      
       pyodide_http._requests.PyodideHTTPAdapter._old_send = pyodide_http._requests.PyodideHTTPAdapter.send
       def PyodideHTTPAdapter_send(self, request, **kwargs):
         response = self._old_send(request, **kwargs)
