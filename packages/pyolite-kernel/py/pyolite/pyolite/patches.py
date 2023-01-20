@@ -4,9 +4,15 @@ def patch_matplotlib():
     if not os.environ.get("MPLBACKEND"):
         os.environ["MPLBACKEND"] = "module://matplotlib_inline.backend_inline"
 
+def register_runtime():
+    import os
+
+    if not os.environ.get("COGNITE_PYTHON_RUNTIME"):
+        os.environ["COGNITE_PYTHON_RUNTIME"] = "PYODIDE"
 
 ALL_PATCHES = [
     patch_matplotlib,
+    register_runtime,
 ]
 
 

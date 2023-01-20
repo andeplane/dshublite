@@ -19,7 +19,7 @@ export class PyoliteRemoteKernel {
    **/
   async initialize(options: IPyoliteWorkerKernel.IOptions): Promise<void> {
     this._options = options;
-    
+
     if (options.location.includes(':')) {
       const parts = options.location.split(':');
       this._driveName = parts[0];
@@ -96,6 +96,26 @@ export class PyoliteRemoteKernel {
       await piplite.install(['pyodide-http'], keep_going=True);
       await piplite.install(['requests'], keep_going=True);
       await piplite.install(['cognite-sdk'], keep_going=True);
+      await piplite.install(['pandas'], keep_going=True);
+
+      # We need to patch a few things:
+      # 1) disable gzip as it is not supported
+      # 2) patch requests as it does not work in pyodide
+      # 3) patch the patched requests (From pyodide-http) as Cognite SDK expects responses to have .raw set
+      # 4) patch Cognite SDK to use another HTTP adapter
+      # 5) patch Cognite SDK to use a mock implementation of the PriorityThreadPoolExecutor since threading is not supported in pyodide
+      # 6) patch Cognite SDK to have max_workers = 1
+      # 7) disable warning on non compiled protobuf version
+
+      # Disable protobuf warning
+      import warnings
+      warnings.filterwarnings(
+          action="ignore",
+          category=UserWarning,
+          message="Your installation of 'protobuf' is missing compiled C binaries",
+      )
+
+      # These are mock classes for the PriorityThreadPoolExecutor. TODO: Move to Cognite SDK
 
       import functools
       import inspect
@@ -151,26 +171,35 @@ export class PyoliteRemoteKernel {
       import pyodide_http
 
       pyodide_http.patch_all()
+
+      # Patch Cognite SDK
+
       import cognite.client
       from cognite.client import global_config
       global_config.disable_gzip = True
-      global_config.max_workers = 1
+
       pyodide_http._requests.PyodideHTTPAdapter._old_send = pyodide_http._requests.PyodideHTTPAdapter.send
-      def new_send(self, request, **kwargs):
-          response = self._old_send(request, **kwargs)
-          response.raw.version = ''
-          return response
-      pyodide_http._requests.PyodideHTTPAdapter.send = new_send
+      def PyodideHTTPAdapter_send(self, request, **kwargs):
+        response = self._old_send(request, **kwargs)
+        response.raw.version = ''
+        return response
+      pyodide_http._requests.PyodideHTTPAdapter.send = PyodideHTTPAdapter_send
 
       cognite.client._http_client.HTTPClient._old_init = cognite.client._http_client.HTTPClient.__init__
-      def new_init(self, config, session, retry_tracker_factory = cognite.client._http_client._RetryTracker):
-          self._old_init(config, session, retry_tracker_factory)
-          self.session.mount("https://", pyodide_http._requests.PyodideHTTPAdapter())
-          self.session.mount("http://", pyodide_http._requests.PyodideHTTPAdapter())
-      cognite.client._http_client.HTTPClient.__init__ = new_init
+      def HTTPClient_init(self, config, session, retry_tracker_factory = cognite.client._http_client._RetryTracker):
+        self._old_init(config, session, retry_tracker_factory)
+        self.session.mount("https://", pyodide_http._requests.PyodideHTTPAdapter())
+        self.session.mount("http://", pyodide_http._requests.PyodideHTTPAdapter())
+      cognite.client._http_client.HTTPClient.__init__ = HTTPClient_init
 
       cognite.client._api.datapoints.PriorityThreadPoolExecutor = MockPriorityThreadPoolExecutor
       cognite.client._api.datapoints.as_completed = mock_as_completed
+
+      cognite.client.config.ClientConfig._old_init = cognite.client.config.ClientConfig.__init__
+      def ClientConfig_init(self, client_name, project, credentials, api_subversion = None, base_url = None, max_workers = None, headers = None, timeout = None, file_transfer_timeout = None, debug = False):
+        self._old_init(client_name, project, credentials, api_subversion, base_url, max_workers, headers, timeout, file_transfer_timeout, debug)
+        self.max_workers = 1
+      cognite.client.config.ClientConfig.__init__ = ClientConfig_init
     `);
   }
 
