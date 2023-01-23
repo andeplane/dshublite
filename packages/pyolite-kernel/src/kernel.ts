@@ -55,7 +55,7 @@ export class PyoliteKernel extends BaseKernel implements IKernel {
       var tx = db.transaction("TokenStore", "readwrite");
       var store = tx.objectStore("TokenStore");
       
-      // Add some data
+      // Add token data
       store.put({id: "token", value: token});
       store.put({id: "baseUrl", value: baseUrl});
       store.put({id: "project", value: project});
