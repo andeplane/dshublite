@@ -109,6 +109,7 @@ export class PyoliteRemoteKernel {
           await piplite.install(['requests'], keep_going=True);
           await piplite.install(['cognite-sdk'], keep_going=True);
           await piplite.install(['pandas'], keep_going=True);
+          await piplite.install(['matplotlib'], keep_going=True);
 
           # We need to patch a few things:
           # 1) disable gzip as it is not supported
