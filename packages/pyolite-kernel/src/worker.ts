@@ -77,17 +77,15 @@ export class PyoliteRemoteKernel {
   }
 
   protected async patchCognite(options: IPyoliteWorkerKernel.IOptions): Promise<void> {
-    // Open (or create) the database
+    // First see if we have a token set in the CogniteVault IndexedDB store
     var open = indexedDB.open("CogniteVault", 1);
 
-    // Create the schema
     open.onupgradeneeded = function() {
       var db = open.result;
       db.createObjectStore("TokenStore", {keyPath: "id"});
     };
 
     open.onsuccess = async () => {
-      // Start a new transaction
       var db = open.result;
       var tx = db.transaction("TokenStore", "readonly");
       var store = tx.objectStore("TokenStore");
@@ -105,7 +103,7 @@ export class PyoliteRemoteKernel {
           os.environ["COGNITE_PROJECT"] = "${project.value}"
           os.environ["COGNITE_BASE_URL"] = "${baseUrl.value}"
         `);
-        
+
         await this._pyodide.runPythonAsync(`
           await piplite.install(['pyodide-http'], keep_going=True);
           await piplite.install(['requests'], keep_going=True);

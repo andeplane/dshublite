@@ -22,14 +22,14 @@ export class PyoliteKernel extends BaseKernel implements IKernel {
    */
   constructor(options: PyoliteKernel.IOptions) {
     super(options);
-    this.parseQueryParams();
+    this.parseQueryParamsAndStoreToken();
     this._worker = this.initWorker(options);
     this._worker.onmessage = (e) => this._processWorkerMessage(e.data);
     this._remoteKernel = wrap(this._worker);
     this.initRemote(options);
   }
 
-  protected parseQueryParams() {
+  protected parseQueryParamsAndStoreToken() {
     const params = new Proxy(new URLSearchParams(window.location.search), {
       get: (searchParams, prop: string) => searchParams.get(prop),
     });
