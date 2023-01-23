@@ -77,11 +77,6 @@ export class PyoliteRemoteKernel {
   }
 
   protected async patchCognite(options: IPyoliteWorkerKernel.IOptions): Promise<void> {
-    await this._pyodide.runPythonAsync(`
-      import os;
-      os.environ["COGNITE_PATCHED"] = "5.0"
-    `);
-    
     // Open (or create) the database
     var open = indexedDB.open("CogniteVault", 1);
 
@@ -94,7 +89,7 @@ export class PyoliteRemoteKernel {
     open.onsuccess = async () => {
       // Start a new transaction
       var db = open.result;
-      var tx = db.transaction("TokenStore", "readwrite");
+      var tx = db.transaction("TokenStore", "readonly");
       var store = tx.objectStore("TokenStore");
 
       let allItems = store.getAll()
@@ -110,6 +105,7 @@ export class PyoliteRemoteKernel {
           os.environ["COGNITE_PROJECT"] = "${project.value}"
           os.environ["COGNITE_BASE_URL"] = "${baseUrl.value}"
         `);
+        
         await this._pyodide.runPythonAsync(`
           await piplite.install(['pyodide-http'], keep_going=True);
           await piplite.install(['requests'], keep_going=True);
@@ -124,9 +120,6 @@ export class PyoliteRemoteKernel {
           # 5) patch Cognite SDK to use a mock implementation of the PriorityThreadPoolExecutor since threading is not supported in pyodide
           # 6) patch Cognite SDK to have max_workers = 1
           # 7) disable warning on non compiled protobuf version
-
-          import os
-          os.environ["COGNITE_PATCHED"] = "10.0"
 
           # Disable protobuf warning
           import warnings
