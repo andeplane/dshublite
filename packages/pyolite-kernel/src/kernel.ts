@@ -22,10 +22,58 @@ export class PyoliteKernel extends BaseKernel implements IKernel {
    */
   constructor(options: PyoliteKernel.IOptions) {
     super(options);
+    this.parseQueryParams();
     this._worker = this.initWorker(options);
     this._worker.onmessage = (e) => this._processWorkerMessage(e.data);
     this._remoteKernel = wrap(this._worker);
     this.initRemote(options);
+  }
+
+  protected parseQueryParams() {
+    const params = new Proxy(new URLSearchParams(window.location.search), {
+      get: (searchParams, prop: string) => searchParams.get(prop),
+    });
+    // @ts-ignore
+    let token = params.token
+    // @ts-ignore
+    let baseUrl = params.baseUrl
+    // @ts-ignore
+    let project = params.project
+    
+    // Open (or create) the database
+    var open = indexedDB.open("CogniteVault", 1);
+
+    // Create the schema
+    open.onupgradeneeded = function() {
+      var db = open.result;
+      db.createObjectStore("TokenStore", {keyPath: "id"});
+    };
+
+    open.onsuccess = async function() {
+      // Start a new transaction
+      var db = open.result;
+      var tx = db.transaction("TokenStore", "readwrite");
+      var store = tx.objectStore("TokenStore");
+      
+      // Add some data
+      store.put({id: "token", value: token});
+      store.put({id: "baseUrl", value: baseUrl});
+      store.put({id: "project", value: project});
+
+      let allItems = store.getAll()
+      allItems.onsuccess = () => {
+        console.log("Items: ", allItems.result)
+      }
+
+      // getToken.onsuccess = function() {
+      //     console.log(getToken.result.value);
+      // };
+
+      // Close the db when the transaction is done
+      tx.oncomplete = function() {
+          db.close();
+      };
+    }
   }
 
   /**

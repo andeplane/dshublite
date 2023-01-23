@@ -33,6 +33,7 @@ export class PyoliteRemoteKernel {
     await this.initFilesystem(options);
     await this.initPackageManager(options);
     await this.initKernel(options);
+    await this.patchCognite(options);
     await this.initGlobals(options);
     this._initializer?.resolve();
   }
@@ -75,6 +76,174 @@ export class PyoliteRemoteKernel {
     `);
   }
 
+  protected async patchCognite(options: IPyoliteWorkerKernel.IOptions): Promise<void> {
+    await this._pyodide.runPythonAsync(`
+      import os;
+      os.environ["COGNITE_PATCHED"] = "5.0"
+    `);
+    
+    // Open (or create) the database
+    var open = indexedDB.open("CogniteVault", 1);
+
+    // Create the schema
+    open.onupgradeneeded = function() {
+      var db = open.result;
+      db.createObjectStore("TokenStore", {keyPath: "id"});
+    };
+
+    open.onsuccess = async () => {
+      // Start a new transaction
+      var db = open.result;
+      var tx = db.transaction("TokenStore", "readwrite");
+      var store = tx.objectStore("TokenStore");
+
+      let allItems = store.getAll()
+      allItems.onsuccess = async () => {
+        const result = allItems.result
+        const token = result.filter(item => item.id === "token")[0]
+        const project = result.filter(item => item.id === "project")[0]
+        const baseUrl = result.filter(item => item.id === "baseUrl")[0]
+        
+        await this._pyodide.runPythonAsync(`
+          import os;
+          os.environ["COGNITE_TOKEN"] = "${token.value}"
+          os.environ["COGNITE_PROJECT"] = "${project.value}"
+          os.environ["COGNITE_BASE_URL"] = "${baseUrl.value}"
+        `);
+        await this._pyodide.runPythonAsync(`
+          await piplite.install(['pyodide-http'], keep_going=True);
+          await piplite.install(['requests'], keep_going=True);
+          await piplite.install(['cognite-sdk'], keep_going=True);
+          await piplite.install(['pandas'], keep_going=True);
+
+          # We need to patch a few things:
+          # 1) disable gzip as it is not supported
+          # 2) patch requests as it does not work in pyodide
+          # 3) patch the patched requests (From pyodide-http) as Cognite SDK expects responses to have .raw set
+          # 4) patch Cognite SDK to use another HTTP adapter
+          # 5) patch Cognite SDK to use a mock implementation of the PriorityThreadPoolExecutor since threading is not supported in pyodide
+          # 6) patch Cognite SDK to have max_workers = 1
+          # 7) disable warning on non compiled protobuf version
+
+          import os
+          os.environ["COGNITE_PATCHED"] = "10.0"
+
+          # Disable protobuf warning
+          import warnings
+          warnings.filterwarnings(
+              action="ignore",
+              category=UserWarning,
+              message="Your installation of 'protobuf' is missing compiled C binaries",
+          )
+          
+          # These are mock classes for the PriorityThreadPoolExecutor. TODO: Move to Cognite SDK
+
+          import functools
+          import inspect
+          from concurrent.futures import CancelledError
+          from typing import Dict
+
+          class MockFuture:
+              def __init__(self, fn, args, kwargs):
+                  self._task = functools.partial(fn, *args, **kwargs)
+                  self._result = None
+                  self._is_cancelled = False
+
+              def result(self):
+                  if self._is_cancelled:
+                      raise CancelledError
+
+                  if self._result is None:  # Blocks until done
+                      self._result = self._task()
+                  return self._result
+
+              def cancel(self):
+                  self._is_cancelled = True
+
+
+          def mock_as_completed(dct: Dict) -> MockFuture:
+              # Will raise StopIteration when done (we want this):
+              return iter(dct.copy())
+
+
+          class MockPriorityThreadPoolExecutor:
+              def __init__(self, max_workers: int = None):
+                  if max_workers != 1:
+                      raise RuntimeError("WASM says max max_workers is -e^(i*pi), or one if you wondered")
+
+              def submit(self, fn, *args, **kwargs):
+                  if "priority" in inspect.signature(fn).parameters:
+                      raise TypeError(f"Given function {fn} cannot accept reserved parameter name \`priority\`")
+                  kwargs.pop("priority", None)
+
+                  fake_future = MockFuture(fn, args, kwargs)
+                  return fake_future
+
+              def shutdown(self, wait: bool = False):
+                  return None
+
+              def __enter__(self):
+                  return self
+
+              def __exit__(self, type, value, traceback):
+                  self.shutdown()
+
+          import pyolite
+          import pyodide_http
+
+          pyodide_http.patch_all()
+
+          # Patch Cognite SDK
+
+          import cognite.client
+          from cognite.client import global_config
+          global_config.disable_gzip = True
+
+          pyodide_http._requests.PyodideHTTPAdapter._old_send = pyodide_http._requests.PyodideHTTPAdapter.send
+          def PyodideHTTPAdapter_send(self, request, **kwargs):
+            response = self._old_send(request, **kwargs)
+            response.raw.version = ''
+            return response
+          pyodide_http._requests.PyodideHTTPAdapter.send = PyodideHTTPAdapter_send
+
+          cognite.client._http_client.HTTPClient._old_init = cognite.client._http_client.HTTPClient.__init__
+          def HTTPClient_init(self, config, session, retry_tracker_factory = cognite.client._http_client._RetryTracker):
+            self._old_init(config, session, retry_tracker_factory)
+            self.session.mount("https://", pyodide_http._requests.PyodideHTTPAdapter())
+            self.session.mount("http://", pyodide_http._requests.PyodideHTTPAdapter())
+          cognite.client._http_client.HTTPClient.__init__ = HTTPClient_init
+
+          cognite.client._api.datapoints.PriorityThreadPoolExecutor = MockPriorityThreadPoolExecutor
+          cognite.client._api.datapoints.as_completed = mock_as_completed
+
+          cognite.client.config.ClientConfig._old_init = cognite.client.config.ClientConfig.__init__
+          def ClientConfig_init(self, client_name, project = None, credentials = None, api_subversion = None, base_url = None, max_workers = None, headers = None, timeout = None, file_transfer_timeout = None, debug = False):
+            import os
+            env_vars = ["COGNITE_TOKEN", "COGNITE_BASE_URL", "COGNITE_PROJECT"]
+            if credentials is None and set(os.environ).issuperset(env_vars):
+              from cognite.client.credentials import Token
+              token = os.environ["COGNITE_TOKEN"]
+              if not project:
+                project = os.environ["COGNITE_PROJECT"]
+              if not base_url:
+                base_url = "https://"+os.environ["COGNITE_BASE_URL"]
+              def token_provider():
+                return token
+              credentials = Token(token_provider)
+            self._old_init(client_name, project, credentials, api_subversion, base_url, max_workers, headers, timeout, file_transfer_timeout, debug)
+            self.max_workers = 1
+          cognite.client.config.ClientConfig.__init__ = ClientConfig_init
+        `);
+      }
+      
+      // Close the db when the transaction is done
+      tx.oncomplete = function() {
+          db.close();
+      };
+    }
+  }
+
+
   protected async initKernel(options: IPyoliteWorkerKernel.IOptions): Promise<void> {
     // from this point forward, only use piplite (but not %pip)
     await this._pyodide.runPythonAsync(`
@@ -91,116 +260,6 @@ export class PyoliteRemoteKernel {
         os.chdir("${this._localPath}");
       `);
     }
-
-    await this._pyodide.runPythonAsync(`
-      await piplite.install(['pyodide-http'], keep_going=True);
-      await piplite.install(['requests'], keep_going=True);
-      await piplite.install(['cognite-sdk'], keep_going=True);
-      await piplite.install(['pandas'], keep_going=True);
-
-      # We need to patch a few things:
-      # 1) disable gzip as it is not supported
-      # 2) patch requests as it does not work in pyodide
-      # 3) patch the patched requests (From pyodide-http) as Cognite SDK expects responses to have .raw set
-      # 4) patch Cognite SDK to use another HTTP adapter
-      # 5) patch Cognite SDK to use a mock implementation of the PriorityThreadPoolExecutor since threading is not supported in pyodide
-      # 6) patch Cognite SDK to have max_workers = 1
-      # 7) disable warning on non compiled protobuf version
-
-      # Disable protobuf warning
-      import warnings
-      warnings.filterwarnings(
-          action="ignore",
-          category=UserWarning,
-          message="Your installation of 'protobuf' is missing compiled C binaries",
-      )
-
-      # These are mock classes for the PriorityThreadPoolExecutor. TODO: Move to Cognite SDK
-
-      import functools
-      import inspect
-      from concurrent.futures import CancelledError
-      from typing import Dict
-
-      class MockFuture:
-          def __init__(self, fn, args, kwargs):
-              self._task = functools.partial(fn, *args, **kwargs)
-              self._result = None
-              self._is_cancelled = False
-
-          def result(self):
-              if self._is_cancelled:
-                  raise CancelledError
-
-              if self._result is None:  # Blocks until done
-                  self._result = self._task()
-              return self._result
-
-          def cancel(self):
-              self._is_cancelled = True
-
-
-      def mock_as_completed(dct: Dict) -> MockFuture:
-          # Will raise StopIteration when done (we want this):
-          return iter(dct.copy())
-
-
-      class MockPriorityThreadPoolExecutor:
-          def __init__(self, max_workers: int = None):
-              if max_workers != 1:
-                  raise RuntimeError("WASM says max max_workers is -e^(i*pi), or one if you wondered")
-
-          def submit(self, fn, *args, **kwargs):
-              if "priority" in inspect.signature(fn).parameters:
-                  raise TypeError(f"Given function {fn} cannot accept reserved parameter name \`priority\`")
-              kwargs.pop("priority", None)
-
-              fake_future = MockFuture(fn, args, kwargs)
-              return fake_future
-
-          def shutdown(self, wait: bool = False):
-              return None
-
-          def __enter__(self):
-              return self
-
-          def __exit__(self, type, value, traceback):
-              self.shutdown()
-
-      import pyolite
-      import pyodide_http
-
-      pyodide_http.patch_all()
-
-      # Patch Cognite SDK
-
-      import cognite.client
-      from cognite.client import global_config
-      global_config.disable_gzip = True
-
-      pyodide_http._requests.PyodideHTTPAdapter._old_send = pyodide_http._requests.PyodideHTTPAdapter.send
-      def PyodideHTTPAdapter_send(self, request, **kwargs):
-        response = self._old_send(request, **kwargs)
-        response.raw.version = ''
-        return response
-      pyodide_http._requests.PyodideHTTPAdapter.send = PyodideHTTPAdapter_send
-
-      cognite.client._http_client.HTTPClient._old_init = cognite.client._http_client.HTTPClient.__init__
-      def HTTPClient_init(self, config, session, retry_tracker_factory = cognite.client._http_client._RetryTracker):
-        self._old_init(config, session, retry_tracker_factory)
-        self.session.mount("https://", pyodide_http._requests.PyodideHTTPAdapter())
-        self.session.mount("http://", pyodide_http._requests.PyodideHTTPAdapter())
-      cognite.client._http_client.HTTPClient.__init__ = HTTPClient_init
-
-      cognite.client._api.datapoints.PriorityThreadPoolExecutor = MockPriorityThreadPoolExecutor
-      cognite.client._api.datapoints.as_completed = mock_as_completed
-
-      cognite.client.config.ClientConfig._old_init = cognite.client.config.ClientConfig.__init__
-      def ClientConfig_init(self, client_name, project, credentials, api_subversion = None, base_url = None, max_workers = None, headers = None, timeout = None, file_transfer_timeout = None, debug = False):
-        self._old_init(client_name, project, credentials, api_subversion, base_url, max_workers, headers, timeout, file_transfer_timeout, debug)
-        self.max_workers = 1
-      cognite.client.config.ClientConfig.__init__ = ClientConfig_init
-    `);
   }
 
   protected async initGlobals(options: IPyoliteWorkerKernel.IOptions): Promise<void> {
