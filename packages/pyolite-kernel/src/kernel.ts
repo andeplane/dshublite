@@ -60,15 +60,6 @@ export class PyoliteKernel extends BaseKernel implements IKernel {
       store.put({id: "baseUrl", value: baseUrl});
       store.put({id: "project", value: project});
 
-      let allItems = store.getAll()
-      allItems.onsuccess = () => {
-        console.log("Items: ", allItems.result)
-      }
-
-      // getToken.onsuccess = function() {
-      //     console.log(getToken.result.value);
-      // };
-
       // Close the db when the transaction is done
       tx.oncomplete = function() {
           db.close();
