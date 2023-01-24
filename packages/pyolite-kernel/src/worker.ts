@@ -101,7 +101,7 @@ export class PyoliteRemoteKernel {
           import os;
           os.environ["COGNITE_TOKEN"] = "${token.value}"
           os.environ["COGNITE_PROJECT"] = "${project.value}"
-          os.environ["COGNITE_BASE_URL"] = "${baseUrl.value}"
+          os.environ["COGNITE_BASE_URL"] = "https://${baseUrl.value}"
         `);
 
         await this._pyodide.runPythonAsync(`
@@ -218,7 +218,7 @@ export class PyoliteRemoteKernel {
               if not project:
                 project = os.environ["COGNITE_PROJECT"]
               if not base_url:
-                base_url = "https://"+os.environ["COGNITE_BASE_URL"]
+                base_url = os.environ["COGNITE_BASE_URL"]
               def token_provider():
                 return token
               credentials = Token(token_provider)
