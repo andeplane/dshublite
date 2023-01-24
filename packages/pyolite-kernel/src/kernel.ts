@@ -11,6 +11,9 @@ import { IPyoliteWorkerKernel, IRemotePyoliteWorkerKernel } from './tokens';
 
 import { PIPLITE_WHEEL } from './_pypi';
 
+import mixpanel from 'mixpanel-browser'
+mixpanel.init('fb25742efb56d116b736515a0ad5f6ef', {debug: false}); 
+
 /**
  * A kernel that executes Python code with Pyodide.
  */
@@ -39,6 +42,10 @@ export class PyoliteKernel extends BaseKernel implements IKernel {
     let baseUrl = params.baseUrl
     // @ts-ignore
     let project = params.project
+    // @ts-ignore
+    let email = params.email
+
+    mixpanel.track("DSHubLite.initKernel", {baseUrl, project, distinct_id: email})
     
     // Open (or create) the database
     var open = indexedDB.open("CogniteVault", 1);
@@ -59,7 +66,7 @@ export class PyoliteKernel extends BaseKernel implements IKernel {
       store.put({id: "token", value: token});
       store.put({id: "baseUrl", value: baseUrl});
       store.put({id: "project", value: project});
-
+      
       // Close the db when the transaction is done
       tx.oncomplete = function() {
           db.close();

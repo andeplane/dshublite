@@ -50,13 +50,15 @@
   "dependencies": {
     "@jupyterlite/contents": "^0.1.0-beta.17",
     "@jupyterlite/kernel": "^0.1.0-beta.17",
-    "comlink": "^4.3.1"
+    "comlink": "^4.3.1",
+    "mixpanel-browser": "^2.45.0"
   },
   "devDependencies": {
     "@babel/core": "^7.11.6",
     "@babel/preset-env": "^7.12.1",
     "@jupyterlab/testutils": "~3.5.2",
     "@types/jest": "^26.0.10",
+    "@types/mixpanel-browser": "^2.38.1",
     "jest": "^26.4.2",
     "pyodide": "0.22.0",
     "rimraf": "~3.0.0",
