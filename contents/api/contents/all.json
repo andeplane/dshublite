@@ -11,6 +11,18 @@
       "size": 1216,
       "type": "notebook",
       "writable": true
+    },
+    {
+      "content": null,
+      "created": "2023-01-04T17:52:33.932489Z",
+      "format": null,
+      "last_modified": "2023-01-04T17:48:29.715637Z",
+      "mimetype": null,
+      "name": "ExampleTemplate.ipynb",
+      "path": "ExampleTemplate.ipynb",
+      "size": 1216,
+      "type": "notebook",
+      "writable": false
     }
   ],
   "created": "2023-01-04T17:52:33.932301Z",
