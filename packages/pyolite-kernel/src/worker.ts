@@ -107,8 +107,8 @@ export class PyoliteRemoteKernel {
     await this._pyodide.runPythonAsync(`
       await piplite.install(['pyodide-http'], keep_going=True);
       await piplite.install(['requests'], keep_going=True);
-      # Patching inside the SDK was added in version 5.4.5:
-      await piplite.install(['cognite-sdk>=5.4.5'], keep_going=True);
+      # Patching inside the SDK was added in version 5.6.0:
+      await piplite.install(['cognite-sdk>=5.6.0'], keep_going=True);
       await piplite.install(['pandas'], keep_going=True);
       await piplite.install(['matplotlib'], keep_going=True);
     `);
