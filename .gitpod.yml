@@ -11,6 +11,7 @@ tasks:
   - name: setup
     init: |
       pushd /workspace
+      touch /workspace/.micromamba
       wget -qO- https://micro.mamba.pm/api/micromamba/linux-64/latest | tar -xvj bin/micromamba
       popd
       # bootstrap activation commands for other tasks to reuse
