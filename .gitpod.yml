@@ -24,6 +24,7 @@ tasks:
       EOT
       source /workspace/bin/activate-env.sh
       micromamba config append channels conda-forge
+      micromamba install -n base -y -f .binder/environment.yml
       source /workspace/bin/activate-env.sh
       doit build
     command: |
